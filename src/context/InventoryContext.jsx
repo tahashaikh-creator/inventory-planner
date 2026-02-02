@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo } from 'react';
-import { generateInitialData } from '../data/generate';
+import { generateInitialData, REGION_TRENDS } from '../data/generate';
 import { calculateMetrics } from '../data/calculations';
 
 const InventoryContext = createContext(null);
@@ -20,10 +20,28 @@ function saveToStorage(data) {
   } catch {}
 }
 
+function backfillRecentHistory(data) {
+  // Migrate old saved data that doesn't have recentHistory
+  const needsBackfill = data.records.some(r => !r.recentHistory);
+  if (!needsBackfill) return data;
+
+  return {
+    ...data,
+    records: data.records.map(r => {
+      if (r.recentHistory) return r;
+      const trend = REGION_TRENDS[r.region] || 1.0;
+      return {
+        ...r,
+        recentHistory: r.history.map(v => Math.round(v * trend * (0.85 + Math.random() * 0.30))),
+      };
+    }),
+  };
+}
+
 function getInitialState() {
   const stored = loadFromStorage();
   if (stored && stored.skus && stored.records) {
-    return stored;
+    return backfillRecentHistory(stored);
   }
   return generateInitialData();
 }

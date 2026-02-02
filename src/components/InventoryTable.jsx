@@ -6,6 +6,38 @@ import { useInventory } from '../context/InventoryContext';
 import StatusBadge from './StatusBadge';
 import ExpandedRow from './ExpandedRow';
 
+function TrendBadge({ growthFactor, recentVolume, historicalVolume, isFallback }) {
+  let label, colorClass;
+  const pctChange = Math.round((growthFactor - 1) * 100);
+
+  if (isFallback) {
+    label = 'N/A';
+    colorClass = 'bg-gray-100 text-gray-500';
+  } else if (growthFactor > 1.1) {
+    label = `🔥 +${pctChange}%`;
+    colorClass = 'bg-green-100 text-green-700';
+  } else if (growthFactor < 0.9) {
+    label = `❄️ ${pctChange}%`;
+    colorClass = 'bg-blue-100 text-blue-700';
+  } else {
+    label = 'Flat';
+    colorClass = 'bg-gray-100 text-gray-600';
+  }
+
+  const tooltip = isFallback
+    ? 'Using default growth % (insufficient historical data)'
+    : `Based on last 90 days: ${recentVolume.toLocaleString()} sales vs ${historicalVolume.toLocaleString()} last year`;
+
+  return (
+    <span
+      title={tooltip}
+      className={clsx('inline-block px-2 py-0.5 rounded text-xs font-medium cursor-help', colorClass)}
+    >
+      {label}
+    </span>
+  );
+}
+
 function EditableCell({ value, onChange, className = '' }) {
   return (
     <input
@@ -88,6 +120,7 @@ export default function InventoryTable() {
               </th>
               <th className="w-8 px-1 py-2.5"></th>
               <th className="px-3 py-2.5 font-semibold text-gray-600 text-xs uppercase tracking-wider">SKU Name</th>
+              <th className="px-3 py-2.5 font-semibold text-gray-600 text-xs uppercase tracking-wider text-center">Trend</th>
               {showRegionCol && (
                 <th className="px-3 py-2.5 font-semibold text-gray-600 text-xs uppercase tracking-wider">Region</th>
               )}
@@ -133,6 +166,14 @@ export default function InventoryTable() {
                         {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-900">{record.skuId}</td>
+                      <td className="px-3 py-2 text-center">
+                        <TrendBadge
+                          growthFactor={record.growthFactor}
+                          recentVolume={record.recentVolume}
+                          historicalVolume={record.historicalVolume}
+                          isFallback={record.isGrowthFallback}
+                        />
+                      </td>
                       {showRegionCol && (
                         <td className="px-3 py-2">
                           <span className={clsx(

@@ -50,7 +50,7 @@ export default function HelpCenter() {
           Answers one question per SKU: <strong>"Given my current stock, incoming shipments, open orders, and seasonal demand — do I have enough inventory to last through the next lead-time window, and if not, how much should I order?"</strong>
         </p>
         <p>
-          It uses 12 months of historical sales data to forecast demand, applies a growth multiplier and safety buffer, then compares your effective inventory against the calculated reorder point. The gap (if any) becomes your suggested order.
+          It uses 12 months of historical sales data combined with a <strong>Dynamic Trend (Hybrid) model</strong> to forecast demand. Instead of a single global growth rate, each SKU's growth factor is calculated automatically by comparing its last 90 days of sales against the same period last year. A safety buffer is applied, and your effective inventory is compared against the calculated reorder point. The gap (if any) becomes your suggested order.
         </p>
       </Section>
 
@@ -72,10 +72,22 @@ export default function HelpCenter() {
           <div className="bg-white border border-gray-200 rounded-md px-4 py-3 space-y-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-indigo-600" />
-              <span className="font-semibold text-gray-900">Growth % (default: 20%)</span>
+              <span className="font-semibold text-gray-900">Default Growth % (fallback: 20%)</span>
             </div>
-            <p>Year-over-year growth multiplier applied on top of historical seasonal demand.</p>
-            <Formula>Forecast = Seasonal Demand × (1 + Growth% / 100)</Formula>
+            <p>
+              The system now uses a <strong>Dynamic Trend model</strong> that calculates each SKU's growth automatically. This slider only applies as a fallback for SKUs with insufficient historical data (fewer than 10 units in the comparison window).
+            </p>
+            <Formula>
+              RecentVolume = Sum of sales in last 90 days (this year){'\n'}
+              HistoricalVolume = Sum of sales in same 90 days (last year){'\n'}
+              GrowthFactor = RecentVolume / HistoricalVolume{'\n'}
+              (clamped between 0.5x and 3.0x){'\n'}
+              {'\n'}
+              Forecast = Seasonal Demand × GrowthFactor
+            </Formula>
+            <p className="text-xs text-gray-500">
+              The Trend column in the table shows each SKU's computed growth: 🔥 for &gt;+10%, ❄️ for &lt;-10%, or "Flat" otherwise. Hover over the badge to see the exact comparison volumes.
+            </p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-md px-4 py-3 space-y-2">
@@ -110,29 +122,39 @@ export default function HelpCenter() {
             </p>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-md px-4 py-3">
-            <strong>2. Forecast</strong>
-            <Formula>Forecast = Seasonal Demand × (1 + Growth% / 100)</Formula>
+          <div className="bg-white border border-gray-200 rounded-md px-4 py-3 space-y-2">
+            <strong>2. Dynamic Trend Growth Factor</strong>
+            <p>For each SKU, the system looks back 90 days and compares this year's sales to last year's same window:</p>
+            <Formula>
+              GrowthFactor = RecentVolume (last 90d) / HistoricalVolume (same 90d last year){'\n'}
+              Clamped: min 0.5x, max 3.0x{'\n'}
+              Fallback: (1 + Default Growth%) if historical &lt; 10 units
+            </Formula>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-md px-4 py-3">
-            <strong>3. Safety Stock</strong>
+            <strong>3. Forecast</strong>
+            <Formula>Forecast = Seasonal Demand × GrowthFactor</Formula>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-md px-4 py-3">
+            <strong>4. Safety Stock</strong>
             <Formula>Safety Stock = Forecast × (Safety Factor% / 100)</Formula>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-md px-4 py-3">
-            <strong>4. Reorder Point (ROP)</strong>
+            <strong>5. Reorder Point (ROP)</strong>
             <Formula>ROP = Forecast + Safety Stock</Formula>
             <p>The threshold your net availability is compared against to determine status.</p>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-md px-4 py-3">
-            <strong>5. Net Availability</strong>
+            <strong>6. Net Availability</strong>
             <Formula>Net Availability = Current Stock + Incoming POs − Active Orders</Formula>
           </div>
 
           <div className="bg-white border border-gray-200 rounded-md px-4 py-3">
-            <strong>6. Suggested Order (only when deficit exists)</strong>
+            <strong>7. Suggested Order (only when deficit exists)</strong>
             <Formula>
               Target Stock = ROP + (Avg Daily × 30){'\n'}
               Deficit = Target Stock − Net Availability{'\n'}
@@ -224,7 +246,7 @@ export default function HelpCenter() {
       </Section>
 
       <div className="text-xs text-gray-400 pt-2 pb-4">
-        FrameStock Inventory Planner v1.0 &middot; Multi-Region &middot; Help Center
+        FrameStock Inventory Planner v1.1 &middot; Dynamic Trend Model &middot; Multi-Region &middot; Help Center
       </div>
     </div>
   );

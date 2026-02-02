@@ -53,8 +53,8 @@ export default function SimulationToolbar() {
 
       {/* Growth */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
-          <TrendingUp className="w-3.5 h-3.5" /> Growth %
+        <label className="text-xs font-medium text-gray-500 flex items-center gap-1" title="Fallback growth rate used for SKUs with insufficient historical data">
+          <TrendingUp className="w-3.5 h-3.5" /> Default Growth %
         </label>
         <div className="flex items-center gap-2">
           <input

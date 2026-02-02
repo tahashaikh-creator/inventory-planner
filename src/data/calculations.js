@@ -1,6 +1,66 @@
 import { LEAD_TIMES, DAYS_IN_MONTH } from './generate';
 
 /**
+ * Sum pro-rated sales from a monthly history array over a window of `days`
+ * ending at (endMonth, endDay). Walks backwards from the end date.
+ */
+function sumWindow(history, endMonth, endDay, days) {
+  let total = 0;
+  let daysLeft = days;
+  let m = endMonth;
+  let daysAvailInMonth = endDay; // days consumed from the ending month
+
+  while (daysLeft > 0) {
+    const daysInM = DAYS_IN_MONTH[m];
+    const daysToUse = Math.min(daysLeft, daysAvailInMonth);
+    const dailyRate = history[m] / daysInM;
+    total += dailyRate * daysToUse;
+    daysLeft -= daysToUse;
+    m = (m - 1 + 12) % 12;
+    daysAvailInMonth = DAYS_IN_MONTH[m]; // full month for previous months
+  }
+  return total;
+}
+
+/**
+ * Calculate a SKU-specific growth factor by comparing recent (this-year)
+ * sales to the same 90-day window last year.
+ *
+ * Returns { growthFactor, recentVolume, historicalVolume }
+ */
+export function calculateRealGrowth(record, month, day, defaultGrowthPct) {
+  const LOOKBACK_DAYS = 90;
+  const MIN_HISTORICAL = 10;
+
+  const hasRecentHistory = record.recentHistory && record.recentHistory.length === 12;
+
+  if (!hasRecentHistory) {
+    // No recent data — fall back to global default
+    const fallback = 1 + defaultGrowthPct / 100;
+    return { growthFactor: fallback, recentVolume: 0, historicalVolume: 0, isFallback: true };
+  }
+
+  const recentVolume = sumWindow(record.recentHistory, month, day, LOOKBACK_DAYS);
+  const historicalVolume = sumWindow(record.history, month, day, LOOKBACK_DAYS);
+
+  if (historicalVolume < MIN_HISTORICAL) {
+    const fallback = 1 + defaultGrowthPct / 100;
+    return { growthFactor: fallback, recentVolume: Math.round(recentVolume), historicalVolume: Math.round(historicalVolume), isFallback: true };
+  }
+
+  // Clamp between 0.5x and 3.0x
+  const raw = recentVolume / historicalVolume;
+  const growthFactor = Math.max(0.5, Math.min(3.0, raw));
+
+  return {
+    growthFactor: Math.round(growthFactor * 1000) / 1000,
+    recentVolume: Math.round(recentVolume),
+    historicalVolume: Math.round(historicalVolume),
+    isFallback: false,
+  };
+}
+
+/**
  * Pro-rate seasonal demand across a lead-time window starting at (month, day).
  * history: array of 12 monthly totals (Jan=0 ... Dec=11)
  * month: 0-based month index (0=Jan)
@@ -47,7 +107,8 @@ export function calculateMetrics(record, sku, { month, day, growthPct, safetyPct
   const leadTime = LEAD_TIMES[region];
 
   const seasonalDemand = getSeasonalDemand(record.history, month, day, leadTime);
-  const forecast = seasonalDemand * (1 + growthPct / 100);
+  const growthResult = calculateRealGrowth(record, month, day, growthPct);
+  const forecast = seasonalDemand * growthResult.growthFactor;
   const safetyStock = forecast * (safetyPct / 100);
   const rop = forecast + safetyStock;
 
@@ -82,5 +143,9 @@ export function calculateMetrics(record, sku, { month, day, growthPct, safetyPct
     targetStock: Math.round(targetStock * 100) / 100,
     suggestedOrder: needsOrder ? suggestedOrder : 0,
     status,
+    growthFactor: growthResult.growthFactor,
+    recentVolume: growthResult.recentVolume,
+    historicalVolume: growthResult.historicalVolume,
+    isGrowthFallback: growthResult.isFallback,
   };
 }
